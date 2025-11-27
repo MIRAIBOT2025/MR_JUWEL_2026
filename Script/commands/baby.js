@@ -6,7 +6,7 @@ const botReplies = ["বেশি bot Bot করলে leave নিবো কি
 const randomFromArray = arr => arr[Math.floor(Math.random() * arr.length)];
 
 const baseApiUrl = async () => {
-  const base = await axios.get(`https://raw.githubusercontent.com/Mostakim0978/D1PT0/refs/heads/main/baseApiUrl.json`);
+  const base = await axios.get(`https://raw.githubusercontent.com/Mostakim0978/D1PT0/refs/heads/main/baseApiUrl.json`;
   return base.data.api;
 };
 
