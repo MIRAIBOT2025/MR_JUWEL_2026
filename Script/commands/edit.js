@@ -1,117 +1,121 @@
 const axios = require('axios');
-const fs = require('fs-extra');
+const fs = require('fs-extra'); 
 const path = require('path');
 
-module.exports.config = {
-    name: "edit",
-    version: "1.0",
-    credits: "rX Abdullah",
-    description: "Image editing using API (GitHub Auto API)",
-    usages: "!edit prompt <image/url> OR reply to an image",
-    commandCategory: "AI",
-    cooldowns: 5
-};
+const API_ENDPOINT = "https://tawsif.is-a.dev/gemini/nano-banana"; 
 
-// GitHub JSON API file
-const API_JSON_URL = "https://raw.githubusercontent.com/rummmmna21/rx-api/main/baseApiUrl.json";
+function extractImageUrl(message, args, event) {
+    let imageUrl = args.find(arg => arg.startsWith('http'));
 
-// Load "edit" API from GitHub JSON
-async function loadApiUrl() {
-    try {
-        const res = await axios.get(API_JSON_URL);
-        return res.data.edit; // <- API from JSON key
-    } catch (e) {
-        console.log("API Load Error:", e);
-        return null;
+    if (!imageUrl && event.messageReply && event.messageReply.attachments && event.messageReply.attachments.length > 0) {
+        const imageAttachment = event.messageReply.attachments.find(att => att.type === 'photo' || att.type === 'image');
+        if (imageAttachment && imageAttachment.url) {
+            imageUrl = imageAttachment.url;
+        }
     }
-}
-
-function extractImageUrl(args, event) {
-    let imageUrl = args.find(a => a.startsWith("http"));
-
-    if (!imageUrl && event.messageReply && event.messageReply.attachments?.length > 0) {
-        const img = event.messageReply.attachments.find(
-            a => a.type === "photo" || a.type === "image"
-        );
-        if (img?.url) imageUrl = img.url;
-    }
-
     return imageUrl;
 }
 
-function extractPrompt(args, imageUrl) {
-    let prompt = args.join(" ");
-
-    if (imageUrl) prompt = prompt.replace(imageUrl, "").trim();
-    if (prompt.includes("|")) prompt = prompt.split("|")[0].trim();
+function extractEditPrompt(rawArgs, imageUrl) {
+    let prompt = rawArgs.join(" ");
+    
+    if (imageUrl) {
+        prompt = prompt.replace(imageUrl, '').trim();
+    }
+    
+    if (prompt.includes('|')) {
+        prompt = prompt.split('|')[0].trim();
+    }
 
     return prompt || "enhance quality";
 }
 
-module.exports.run = async function ({ api, event, args }) {
 
-    const API_ENDPOINT = await loadApiUrl();
+module.exports = {
+  config: {
+    name: "edit",
+    aliases: ["imgedit", "nanoedit"],
+    version: "2.3",
+    author: "NeoKEX",
+    countDown: 15,
+    role: 0,
+    longDescription: "Edit or modify an existing image using a text prompt.",
+    category: "ai-image",
+    guide: {
+      en: "{pn} [modification prompt] OR reply to an image with [modification prompt]"
+    }
+  },
 
-    if (!API_ENDPOINT)
-        return api.sendMessage("❌ Failed to load API from GitHub JSON.", event.threadID, event.messageID);
+  onStart: async function({ message, args, event }) {
+    
+    const imageUrl = extractImageUrl(message, args, event);
+    const editPrompt = extractEditPrompt(args, imageUrl);
 
-    const imageUrl = extractImageUrl(args, event);
-    const prompt = extractPrompt(args, imageUrl);
+    if (!imageUrl) {
+      return message.reply("❌ Please provide an image URL or reply to an image to edit.");
+    }
+    if (!editPrompt) {
+        return message.reply("❌ Please provide a prompt describing the modification you want to make.");
+    }
 
-    if (!imageUrl)
-        return api.sendMessage("❌ Please give an image URL or reply to an image.", event.threadID, event.messageID);
-
-    api.setMessageReaction("⏳", event.messageID, () => {}, true);
-
-    let tempFile;
+    message.reaction("⏳", event.messageID);
+    let tempFilePath; 
 
     try {
-        const fullApiUrl = `${API_ENDPOINT}?prompt=${encodeURIComponent(prompt)}&url=${encodeURIComponent(imageUrl)}`;
+      const fullApiUrl = `${API_ENDPOINT}?prompt=${encodeURIComponent(editPrompt)}&url=${encodeURIComponent(imageUrl)}`;
+      
+      const apiResponse = await axios.get(fullApiUrl);
+      const data = apiResponse.data;
 
-        const apiRes = await axios.get(fullApiUrl);
-        const data = apiRes.data;
+      if (!data.success || !data.imageUrl) {
+        throw new Error(data.error || "API returned success: false or missing image URL.");
+      }
 
-        if (!data.success || !data.imageUrl)
-            throw new Error(data.error || "API did not return imageUrl");
+      const finalImageUrl = data.imageUrl;
 
-        const finalUrl = data.imageUrl;
+      const imageDownloadResponse = await axios.get(finalImageUrl, {
+          responseType: 'stream',
+      });
+      
+      const cacheDir = path.join(__dirname, 'cache');
+      if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+      
+      tempFilePath = path.join(cacheDir, `edited_nano_${Date.now()}.png`);
+      
+      const writer = fs.createWriteStream(tempFilePath);
+      imageDownloadResponse.data.pipe(writer);
 
-        const imgStream = await axios.get(finalUrl, { responseType: "stream" });
-
-        const cache = path.join(__dirname, "/cache");
-        if (!fs.existsSync(cache)) fs.mkdirSync(cache);
-
-        tempFile = path.join(cache, `nano_edit_${Date.now()}.png`);
-
-        const writer = fs.createWriteStream(tempFile);
-        imgStream.data.pipe(writer);
-
-        await new Promise((resolve, reject) => {
-            writer.on("finish", resolve);
-            writer.on("error", reject);
+      await new Promise((resolve, reject) => {
+        writer.on("finish", resolve);
+        writer.on("error", (err) => {
+          writer.close();
+          reject(err);
         });
+      });
 
-        api.setMessageReaction("✅", event.messageID, () => {}, true);
+      message.reaction("✅", event.messageID);
+      await message.reply({
+        attachment: fs.createReadStream(tempFilePath)
+      });
 
-        return api.sendMessage(
-            {
-                body: `✨ Edited Image Ready!\nPrompt: ${prompt}`,
-                attachment: fs.createReadStream(tempFile)
-            },
-            event.threadID,
-            () => fs.unlinkSync(tempFile),
-            event.messageID
-        );
+    } catch (error) {
+      message.reaction("❌", event.messageID);
+      
+      let errorMessage = "An error occurred during image editing.";
+      if (error.response && error.response.data && error.response.data.error) {
+         errorMessage += ` (API Error: ${error.response.data.error})`;
+      } else if (error.message) {
+         errorMessage = `❌ ${error.message}`;
+      } else if (error.code) {
+         errorMessage = `❌ Network Error: ${error.code}`;
+      }
 
-    } catch (err) {
-        console.log("EDIT ERROR:", err);
-
-        api.setMessageReaction("❌", event.messageID, () => {}, true);
-
-        return api.sendMessage(
-            `❌ Error: ${err.message || "Something went wrong."}`,
-            event.threadID,
-            event.messageID
-        );
+      console.error("Edit Command Error:", error);
+      message.reply(`❌ ${errorMessage}`);
+    } finally {
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath);
+      }
     }
+  }
 };
