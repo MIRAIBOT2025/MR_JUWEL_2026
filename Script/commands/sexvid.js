@@ -3,15 +3,15 @@
 
 module.exports = {
   config: {
-    name: "sexvid",
-    aliases: ["sex","sexvid"],
+    name: "uff",
+    aliases: ["uff","sexvid"],
     version: "2.0",
     author: "nexo_here",
     countDown: 30,
     role: 2,
     shortDescription: "",
     longDescription: "get kanda/p***n video hilake sojaa",
-    category: "18+",
+    category: "uff",
     guide: "{p}{n}",
   },
 
