@@ -206,7 +206,7 @@ module.exports.handleEvent = async function ({ api, event }) {
     const body = event.body ? event.body.toLowerCase() : "";
 
     // Bengali trigger words with English and Bengali equivalents
-    const triggerWords = ["Riya", "baby", "bbz", "kolixa", "kolija", "রিয়া", "babu", "বেবি", "বিবি", "জান", "কলিজা", "বাবু", "বিবিজেড"];
+    const triggerWords = ["riya", "baby", "bbz", "kolixa", "kolija", "Riya", "babu", "বেবি", "বিবি", "জান", "কলিজা", "বাবু", "বিবিজেড"];
 
     if (triggerWords.includes(body.trim().toLowerCase()) || triggerWords.includes(body.trim())) {
       const babyReplies = [
@@ -267,8 +267,8 @@ module.exports.handleEvent = async function ({ api, event }) {
         "kolixa": kolijaReplies,
         "kolija": kolijaReplies,
         "কলিজা": kolijaReplies,
-        "jan": janReplies,
-        "জান": janReplies,
+        "রিয়া": janReplies,
+        "Riya": janReplies,
         "babu": babuReplies,
         "বাবু": babuReplies
       };
@@ -479,14 +479,14 @@ module.exports.handleEvent = async function ({ api, event }) {
             `কলিজা ${userName}, তুমি আমার হৃদয়ের রানী 👸💕`
           ],
           // All jan related words get same replies  
-          " রিয়া": [
+          "রিয়া": [
             `জান কি জান? 😍 ${userName}, তুমি আমার জান প্রাণ 💕`,
             `${userName} জান, তুমি আমার সব কিছু! 🥰💖`,
             `জান জান ${userName}! তোমার জন্য আমার জান কাঁদে! 😭💔`,
             `${userName} আমার জান, তুমি আমার ভালোবাসার রাজকুমার! 👑💕`,
             `জান ${userName}, তুমি আমার জীবনের জান 💫❤️`
           ],
-          "জান": [
+          "Riya": [
             `জান কি জান? 😍 ${userName}, তুমি আমার জান প্রাণ 💕`,
             `${userName} জান, তুমি আমার সব কিছু! 🥰💖`,
             `জান জান ${userName}! তোমার জন্য আমার জান কাঁদে! 😭💔`,
