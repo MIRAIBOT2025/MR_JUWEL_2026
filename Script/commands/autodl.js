@@ -1,62 +1,55 @@
-handleEvent: async function ({ api, event }) {
-  const axios = require("axios");
-  const fs = require("fs-extra");
-  const request = require("request");
-  const { alldown } = require("shaon-videos-downloader");
+const axios = require("axios");
+const fs = require("fs-extra");
+const { alldown } = require("shaon-videos-downloader");
 
-  const content = (event.body || "").trim();
-  
-  if (!content.startsWith("http://") && !content.startsWith("https://")) return;
-  if (event.senderID === api.getCurrentUserID()) return;
+module.exports = {
+  config: {
+    name: "autodl",
+    version: "0.0.4",
+    hasPermission: 0,
+    credits: "SHAON",
+    description: "Auto Video Downloader",
+    commandCategory: "auto",
+    usages: "",
+    cooldowns: 3,
+  },
 
-  api.setMessageReaction("⏳", event.messageID, () => {}, true);
+  run: async function () {},
 
-  const processingMsg = await api.sendMessage("🔄 তোমার ভিডিও প্রসেসিং করা হচ্ছে দয়া করে অপেক্ষা করুন⊰𝚓𝚞𝚠𝚎𝚕", event.threadID);
+  handleEvent: async function ({ api, event }) {
+    try {
+      const content = event.body ? event.body.toLowerCase() : "";
+      if (!content.startsWith("https://")) return;
 
-  try {
-    const result = await alldown(content);
+      api.setMessageReaction("⚡", event.messageID, () => {}, true);
 
-    let videoUrl = result.url || result.hd || result.sd || result.result || 
-                   (result.data && result.data.url) || (result.data && result.data.hd);
+      const data = await alldown(event.body);
+      if (!data || !data.url) {
+        return api.sendMessage("❌ এই লিঙ্ক থেকে ভিডিও নামানো সম্ভব না!", event.threadID);
+      }
 
-    if (!videoUrl) throw new Error("No video URL found");
+      api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
-    const fileName = `auto_${Date.now()}.mp4`;
-    const filePath = __dirname + `/cache/${fileName}`;
+      const video = (await axios.get(data.url, { responseType: "arraybuffer" })).data;
+      const filePath = __dirname + "/cache/auto.mp4";
+      fs.writeFileSync(filePath, video);
 
-    await new Promise((resolve, reject) => {
-      request(videoUrl)
-        .pipe(fs.createWriteStream(filePath))
-        .on("finish", resolve)
-        .on("error", (err) => {
-          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-          reject(err);
-        });
-    });
+      return api.sendMessage({
+        body: `┏━━━━ 🎬━━━━┓
+⎯꯭𓆩꯭𝆺𝅥😻⃞𝐌⃞𝆠፝֟𝐑᭄ღ倫 𝐉⃞𝐔⃞𝐖⃞𝐄⃞𝐋༢࿐
+┗━━━━ ⚡ ━━━━━━┛
 
-    api.unsendMessage(processingMsg.messageID);
-    api.setMessageReaction("✅", event.messageID, () => {}, true);
+🎞 আপনার ভিডিও রেডি ✔
+📥 Auto Download Complete 🎯
+✨ Enjoy The Video ✨
 
-    await api.sendMessage({
-      body: `༆⃟🌺⃟༓𝐀𝐮𝐭𝐨 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝𝐞𝐫༓⃟🌺⃟༆
-╭───────────────╮
-├ 🌸 ✿ ভিডিও ডাউনলোড সম্পন্ন ✿
-├ 💫 সোর্সঃ অটো ডিটেক্টেড
-├ ⏳ সময়ঃ ${new Date().toLocaleString('bn-BD')}
-╰───────────────╯
+🔥 𝐓𝐡𝐚𝐧𝐤𝐬 𝐅𝐨𝐫 𝐔𝐬𝐢𝐧𝐠 𝐌𝐲 𝐁𝐨𝐭 🔥`,
+        attachment: fs.createReadStream(filePath)
+      }, event.threadID, () => fs.unlinkSync(filePath), event.messageID);
 
-╭─❍
-│ 
-│─⪼⎯꯭𓆩꯭𝆺𝅥😻⃞𝐌⃞𝆠፝֟𝐑᭄ღ倫 𝐉⃞𝐔⃞𝐖⃞𝐄⃞𝐋༢࿐
-╰───────────𐌹𐌹𐌹𐌹𐌹𐌹𐌹𐌹𐌹𐌹𐌹𐌹𐌹`,
-      attachment: fs.createReadStream(filePath)
-    }, event.threadID, () => {
-      fs.unlinkSync(filePath);
-    }, event.messageID);
-
-  } catch (error) {
-    api.unsendMessage(processingMsg.messageID);
-    api.setMessageReaction("❌", event.messageID, () => {}, true);
-    api.sendMessage("❌ ভিডিও ডাউনলোড করতে সমস্যা হয়েছে!\নলিংকটি সাপোর্টেড নয় অথবা ত্রুটি রয়েছে।", event.threadID);
-  }
+    } catch (err) {
+      console.log(err);
+      api.sendMessage("⚠️ কিছু সমস্যা হয়েছে! আবার চেষ্টা করুন।", event.threadID, event.messageID);
     }
+  }
+};
